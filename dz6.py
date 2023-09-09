@@ -1,6 +1,6 @@
 from pathlib import Path
 import shutil
-import sys, re
+import sys
 
 
 TRANSLIT_DICT = {
@@ -21,7 +21,8 @@ usi_rozsh  = { 'documents' : ['.DOC', '.DOCX', '.TXT', '.PDF', '.XLSX', '.PPTX']
 'archives' : ['.ZIP', '.GZ', '.TAR'] 
 }
 
-cpf = {} # count peremishchenna fajliv 
+cpf = {} # count peremishchenna fajliv - потрібен для перейменування файлів з однаковими іменами, для кожної окремої папки буде починатися свій відлік,
+# якщо у різних папках зовсім різні файли з однаковим іменем для прикладу (Документ Microsoft Word.docx). в одному може бути реферат а в іншому перелік покупок ))
 def dz6():
     try:
         shlah_do_papki = Path(sys.argv[1])
@@ -35,8 +36,8 @@ def dz6():
 
 
 
-        def normalize(obj:Path): 
-            lat_obj = obj.stem.translate(TRANSLIT_DICT)
+        def normalize(obj:Path):    #в завданні сказано що функція повинна приймати рядок, але мені здається так зручніше, хоча якщо потрібно то можна і рядок.
+            lat_obj = obj.stem.translate(TRANSLIT_DICT)  
             lat_obj = ''.join(char if char.isalnum() else '_' for char in lat_obj) + obj.suffix
             return lat_obj
     
@@ -56,9 +57,9 @@ def dz6():
                 cilova_papka.mkdir()  
                 cpf[nova_papka] = 1
             
-            normalize_z = normalize(obj)
+            normalize_z = normalize(obj)  
             put1 = cilova_papka.joinpath(normalize_z)
-            put2 = cilova_papka.joinpath(str(cpf.get(nova_papka)) + normalize_z)
+            put2 = cilova_papka.joinpath(str(cpf.get(nova_papka)) + normalize_z) # поробив змінні щоб кожного разу не виконувало одну і ту ж функцію 
             
             if not put1.exists():
                 shutil.move(obj, put1)
@@ -76,16 +77,14 @@ def dz6():
                 cpf[nova_papka] += 1     
 
             return
-
-
-        
-        
+       
         usi_objekty = Path(shlah_do_papki).rglob("**/*")
 
         for obj in usi_objekty:
             
             if obj.is_file() and 'archives' not in str(obj):    
-                if str(obj.parent.name) not in usi_rozsh and obj.parent.name != "others":     
+                if obj.parent.name not in usi_rozsh and obj.parent.name != "others": # це потрібно щоб при повторному виклику на вже відсортовану папку
+                    # не було повторного сортування, а також не лізло в папку з рощпакованими архівами
                                            
                     nova_papka = sortirovka(obj)   
                     peremishch_file(obj, shlah_do_papki, nova_papka)              
