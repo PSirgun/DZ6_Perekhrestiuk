@@ -14,27 +14,28 @@ TRANSLIT_DICT = {
     ord("Ш"): "Sh", ord("Щ"): "Shch", ord("Ь"): " ", ord("Ю"): "Ju", ord("Я"): "Ja"
 }  
 
-usi_rozsh  = { 'documents' : ['.DOC', '.DOCX', '.TXT', '.PDF', '.XLSX', '.PPTX'], 
+all_known_ext  = { 'documents' : ['.DOC', '.DOCX', '.TXT', '.PDF', '.XLSX', '.PPTX'], 
 'images' : ['.JPEG', '.PNG', '.JPG', '.SVG', '.BMP'], 
 'audio' : ['.MP3', '.OGG', '.WAV', '.AMR'],
 'video' : ['.AVI', '.MP4', '.MOV', '.MKV'],
 'archives' : ['.ZIP', '.GZ', '.TAR'] 
 }
+unknown_ext_set = set()
+known_ext_set = set()
+known_ext_dict = {}
 
 cpf = {} # count peremishchenna fajliv - потрібен для перейменування файлів з однаковими іменами, для кожної окремої папки буде починатися свій відлік,
 # якщо у різних папках зовсім різні файли з однаковим іменем для прикладу (Документ Microsoft Word.docx). в одному може бути реферат а в іншому перелік покупок ))
 def dz6():
     try:
-        shlah_do_papki = Path(sys.argv[1])
+        folder_path = Path(sys.argv[1])  
     except IndexError:
         print("Не введено шляху")
         return  
-    if not shlah_do_papki.exists():
+    if not folder_path.exists():
         print ("Шляху до папки не існує")
         return 
     else:
-
-
 
         def normalize(obj:Path):    #в завданні сказано що функція повинна приймати рядок, але мені здається так зручніше, хоча якщо потрібно то можна і рядок.
             lat_obj = obj.stem.translate(TRANSLIT_DICT)  
@@ -42,55 +43,73 @@ def dz6():
             return lat_obj
     
 
-        def sortirovka(obj:Path):  
-            for ima_papky, rozsh in usi_rozsh.items():
-                if obj.suffix.upper() in rozsh:
-                    return ima_papky
+        def sort(obj:Path):  
+            for folder_name, extensions in all_known_ext.items():
+                if obj.suffix.upper() in extensions:
+                    if folder_name not in known_ext_dict:
+                        known_ext_dict[folder_name] = []
+                    known_ext_set.add(obj.suffix)
+                    return folder_name
+            
+            unknown_ext_set.add(obj.suffix.upper())
             return "others"
 
 
-        def peremishch_file(obj:Path, shlah_do_papki:Path, nova_papka:str):
+        def moving_files(obj:Path, folder_path:Path, new_folder:str):
             global cpf
-            cilova_papka = Path(shlah_do_papki).joinpath(nova_papka) 
+            dest_folder = Path(folder_path).joinpath(new_folder) 
 
-            if not cilova_papka.exists():
-                cilova_papka.mkdir()  
-                cpf[nova_papka] = 1
+            if not dest_folder.exists():
+                dest_folder.mkdir()  
+                cpf[new_folder] = 1
             
             normalize_z = normalize(obj)  
-            put1 = cilova_papka.joinpath(normalize_z)
-            put2 = cilova_papka.joinpath(str(cpf.get(nova_papka)) + normalize_z) # поробив змінні щоб кожного разу не виконувало одну і ту ж функцію 
+            way1 = dest_folder.joinpath(normalize_z)
+            way2 = dest_folder.joinpath(str(cpf.get(new_folder)) + normalize_z) # поробив змінні щоб кожного разу не виконувало одну і ту ж функцію 
             
-            if not put1.exists():
-                shutil.move(obj, put1)
-
-                if cilova_papka.name == "archives":
-                    shutil.unpack_archive(put1,put1.with_suffix(''))
-                    put1.unlink()               
+            if not way1.exists():
+                shutil.move(obj, way1)                                            # ця і наступні 3 стрічки можна занести в функцію але залишу так :)
+                print ("| {:<10}| {:<14}| {:<10}".format(obj.suffix, new_folder, way1.stem))
+                if dest_folder.name == "archives":
+                    shutil.unpack_archive(way1,way1.with_suffix(''))
+                    
             else:
                 
-                shutil.move(obj, put2)
-
-                if cilova_papka.name == "archives":
-                    shutil.unpack_archive(put2,put2.with_suffix(''))
-                    put2.unlink() 
-                cpf[nova_papka] += 1     
+                shutil.move(obj, way2)
+                print ("| {:<10}| {:<14}| {:<10}".format(obj.suffix, new_folder, way2.stem))
+                if dest_folder.name == "archives":
+                    shutil.unpack_archive(way2,way2.with_suffix(''))
+                cpf[new_folder] += 1     
 
             return
-       
-        usi_objekty = Path(shlah_do_papki).rglob("**/*")
+        
+        
+        print ("\n| {:<10}| {:<14}| {:<10}".format('Розширення', 'цільова папка','назва файлу'))
+        print ("---------------------------------------")
+        usi_objekty = Path(folder_path).rglob("**/*")
 
         for obj in usi_objekty:
             
             if obj.is_file() and 'archives' not in str(obj):    
-                if obj.parent.name not in usi_rozsh and obj.parent.name != "others": # це потрібно щоб при повторному виклику на вже відсортовану папку
-                    # не було повторного сортування, а також не лізло в папку з рощпакованими архівами
+                if obj.parent.name not in all_known_ext and obj.parent.name != "others": # це потрібно щоб при повторному виклику на вже відсортовану папку
+# не було повторного сортування, а також не лізло в папку з розпакованими архівами
                                            
-                    nova_papka = sortirovka(obj)   
-                    peremishch_file(obj, shlah_do_papki, nova_papka)              
+                    new_folder = sort(obj)  
+                    moving_files(obj, folder_path, new_folder)              
+        
+        
+               
+        for key in all_known_ext:           # От прям, знаю що це можна зробити якось простіше в сортуванні але не придумав як так що ось!
+            for ext in all_known_ext[key]:
+                if ext.lower() in known_ext_set:
+                    known_ext_dict[key].append(ext)
 
-        for obj in Path(shlah_do_papki).glob('*'):
-            if obj.name not in usi_rozsh and obj.name != "others":
+        print(f"Невідомі розширення файлів - {unknown_ext_set}") 
+        print(f"Знайдені відомі розширення файлів - {known_ext_dict}") 
+
+      
+        for obj in Path(folder_path).glob('*'):
+            if obj.name not in all_known_ext and obj.name != "others":
                 shutil.rmtree(obj)
 
         print ("Готово")
@@ -103,9 +122,5 @@ if __name__ == "__main__":
     
     dz6()
 
-
-
-
-
-
-
+# PS  назви змінних українською легше сприймати на фоні того що різні вбудовані частини коду підсвічуються так само як змінні, голубеньким кольором.  
+# і коли я бачу слово, наприклад, "papka" я відразу розумію що це не якийсь метод чи ідентифікатор. 
